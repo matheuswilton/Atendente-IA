@@ -1,153 +1,155 @@
-# Agente de Atendimento com IA
+# AI Customer Service Agent
 
-![testes](https://github.com/matheuswilton/Atendente-IA/actions/workflows/testes.yml/badge.svg)
+![tests](https://github.com/matheuswilton/Atendente-IA/actions/workflows/testes.yml/badge.svg)
 
-API REST em Python que simula um agente de atendimento ao cliente de uma loja virtual (a Loja Aurora, fictícia), parecido com os chatbots que a Blip constrói. Ele entende a mensagem com IA, consulta uma base de perguntas frequentes e responde. Também lembra da conversa, passa para um humano quando precisa e gera relatórios com SQL. Tem uma página de chat e um painel para testar no navegador.
+A Python REST API that works as a customer service agent for an online store (Loja Aurora, a fictional Brazilian shop), similar to the chatbots Blip builds. It understands each message with AI, checks a store FAQ, answers, remembers the conversation, hands off to a human when needed and builds SQL reports. It comes with a chat page and a report dashboard you can open in the browser.
 
-**Demo no ar:** _(link entra aqui depois do deploy no Render)_
+**Live demo:** _(coming soon)_
 
-## O que ele faz
-1. **Entende a mensagem** com IA (API REST da Anthropic). Descobre a intenção (rastreio, troca, pagamento, suporte, elogio, cancelamento, dúvida frequente ou outro) e a urgência (baixa, média ou alta).
-2. **Consulta as perguntas frequentes da loja** antes de responder e manda as mais parecidas para a IA, que só pode usar essas informações. Isso evita respostas inventadas.
-3. **Lembra da conversa**: as últimas 6 mensagens de cada `conversa_id` vão junto para a IA.
-4. **Transfere para humano** quando a urgência é alta ou o assunto não foi entendido.
-5. **Guarda tudo em banco SQL**: SQLite por padrão, ou PostgreSQL se a variável `DATABASE_URL` existir.
-6. **Mostra um painel** (`/painel`) com total de atendimentos, % para humano e contagem por intenção e urgência, protegido por chave.
-7. **Não fica fora do ar**: se não houver chave, ou se a IA falhar ou devolver algo inválido, um plano B por regras responde no lugar. O motivo da falha vai para o log.
-8. **Protege os dados**: as rotas com dados de clientes exigem uma chave, o envio de mensagens tem limite por minuto por IP e o texto do cliente não vai para o log.
+> The store, the chat page and the code names are in Portuguese, because the agent talks to Brazilian customers.
 
-## Como funciona
+## What it does
+1. **Understands the message** with AI (Anthropic REST API). It finds the intent (order tracking, exchange, payment, tech support, compliment, cancellation, FAQ question or other) and the urgency (low, medium or high).
+2. **Checks the store FAQ** before answering and sends the closest questions to the AI, which may only use that information. This keeps it from making things up.
+3. **Remembers the conversation**: the last 6 messages of each `conversa_id` go along to the AI.
+4. **Hands off to a human** when urgency is high or the topic was not understood.
+5. **Stores everything in a SQL database**: SQLite by default, or PostgreSQL when `DATABASE_URL` is set.
+6. **Shows a dashboard** (`/painel`) with total conversations, % sent to a human and counts by intent and urgency, protected by a key.
+7. **Stays up**: with no API key, or if the AI fails or returns something invalid, a rule-based fallback answers instead. The reason for the failure goes to the log.
+8. **Protects data**: routes with customer data require a key, sending messages has a per-minute limit per IP, and the customer's text never goes to the log.
+
+## How it works
 ```mermaid
 flowchart LR
-    Cliente -->|POST /atendimentos| API[api.py<br>valida, limita, registra]
-    API --> Historico[(banco.py<br>historico da conversa)]
-    API --> Analise[analise.py]
-    Analise --> FAQ[perguntas_frequentes.py<br>busca as perguntas parecidas]
-    Analise -->|tem chave| IA[API da Anthropic<br>responde em JSON]
-    IA -->|falhou ou JSON invalido| PlanoB[plano B por regras]
-    Analise -->|sem chave| PlanoB
-    Analise --> Regra{urgencia alta<br>ou assunto desconhecido?}
-    Regra -->|sim| Humano[transferir para humano]
-    API --> Banco[(SQLite ou PostgreSQL)]
-    Banco --> Painel[GET /relatorio e /painel]
+    Customer -->|POST /atendimentos| API[api.py<br>validates, limits, logs]
+    API --> History[(banco.py<br>conversation history)]
+    API --> Analysis[analise.py]
+    Analysis --> FAQ[perguntas_frequentes.py<br>finds similar questions]
+    Analysis -->|has key| AI[Anthropic API<br>answers in JSON]
+    AI -->|failed or invalid JSON| Fallback[rule-based fallback]
+    Analysis -->|no key| Fallback
+    Analysis --> Rule{high urgency<br>or unknown topic?}
+    Rule -->|yes| Human[hand off to a human]
+    API --> DB[(SQLite or PostgreSQL)]
+    DB --> Dashboard[GET /relatorio and /painel]
 ```
 
-## O que este projeto mostra
-| Habilidade | Onde está no projeto |
+## Skills shown in this project
+| Skill | Where it is |
 |---|---|
-| Python | código todo; funções pequenas, cada arquivo com uma responsabilidade |
-| SQL e banco de dados | `banco.py`: `INSERT ... RETURNING`, `GROUP BY`, `COUNT`, filtros; o mesmo SQL roda no SQLite e no PostgreSQL |
-| APIs REST | `api.py` (FastAPI) expõe a API; `analise.py` consome a API REST da Anthropic com `requests` |
-| IA aplicada | prompt com regras da loja, saída em JSON validada, base de conhecimento (perguntas frequentes), plano B |
-| Testes automatizados | `testes/`: mais de 60 testes com pytest, incluindo a IA simulada e o PostgreSQL |
-| Git e GitHub | commits pequenos por assunto; GitHub Actions roda os testes a cada push |
-| Segurança | chave nas rotas de dados, limite por minuto, texto do cliente tratado como dado no prompt, logs sem dados pessoais |
-| Deploy | `Dockerfile` e `render.yaml` para publicar no Render |
+| Python | the whole codebase; small functions, one responsibility per file |
+| SQL and databases | `banco.py`: `INSERT ... RETURNING`, `GROUP BY`, `COUNT`, filters; the same SQL runs on SQLite and PostgreSQL |
+| REST APIs | `api.py` (FastAPI) exposes the API; `analise.py` calls the Anthropic REST API with `requests` |
+| Applied AI | prompt with the store rules, validated JSON output, knowledge base (FAQ), fallback |
+| Automated tests | `testes/`: 60+ pytest tests, including a simulated AI and PostgreSQL |
+| Git and GitHub | small commits by topic; GitHub Actions runs the tests on every push |
+| Security | key on data routes, per-minute limit, customer text treated as data in the prompt, no personal data in logs |
+| Deployment | `Dockerfile` and `render.yaml` to publish on Render |
 
-## Tecnologias
-Python 3 · FastAPI · SQL (SQLite e PostgreSQL) · API REST (`requests`) · pytest · GitHub Actions · Docker · Render
+## Tech
+Python 3 · FastAPI · SQL (SQLite and PostgreSQL) · REST API (`requests`) · pytest · GitHub Actions · Docker · Render
 
-## Como rodar
+## Running it
 ```bash
 git clone https://github.com/matheuswilton/Atendente-IA
 cd Atendente-IA
 pip install -r requirements.txt
-python atendente.py demo          # demonstração no terminal
-uvicorn api:app --reload          # API, chat em http://localhost:8000 e painel em /painel
+python atendente.py demo          # terminal demo
+uvicorn api:app --reload          # API, chat at http://localhost:8000 and dashboard at /painel
 ```
-Documentação interativa da API: `http://localhost:8000/docs`
+Interactive API docs: `http://localhost:8000/docs`
 
-### Variáveis de ambiente
-| Variável | Para quê | Obrigatória |
+### Environment variables
+| Variable | What it does | Required |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | liga a IA (sem ela, o plano B por regras responde) | não |
-| `CHAVE_DO_SERVICO` | protege `/atendimentos` (GET), `/relatorio` e os dados do `/painel` com o cabeçalho `x-chave` | recomendada em produção |
-| `DATABASE_URL` | usa PostgreSQL no lugar do SQLite (os dados não somem quando o servidor reinicia) | não |
-| `BANCO_ATENDIMENTOS` | caminho do arquivo SQLite (padrão `atendimentos.db`) | não |
-| `LIMITE_POR_MINUTO` | mensagens por minuto por IP (padrão 10) | não |
-| `NIVEL_DO_LOG` | detalhe do log: `DEBUG`, `INFO` (padrão), `WARNING` | não |
+| `ANTHROPIC_API_KEY` | turns on the AI (without it, the rule-based fallback answers) | no |
+| `CHAVE_DO_SERVICO` | protects `/atendimentos` (GET), `/relatorio` and the `/painel` data with the `x-chave` header | recommended in production |
+| `DATABASE_URL` | uses PostgreSQL instead of SQLite (data survives server restarts) | no |
+| `BANCO_ATENDIMENTOS` | SQLite file path (default `atendimentos.db`) | no |
+| `LIMITE_POR_MINUTO` | messages per minute per IP (default 10) | no |
+| `NIVEL_DO_LOG` | log detail: `DEBUG`, `INFO` (default), `WARNING` | no |
 
-A chave fica só no seu computador ou no painel do Render, nunca no código:
+The key lives only on your computer or in the Render dashboard, never in the code:
 ```bash
 # Windows (PowerShell)
-$env:ANTHROPIC_API_KEY="sua-chave"
+$env:ANTHROPIC_API_KEY="your-key"
 # Linux/Mac
-export ANTHROPIC_API_KEY="sua-chave"
+export ANTHROPIC_API_KEY="your-key"
 ```
 
 ## Endpoints
-| Método | Rota | O que faz | Exige chave |
+| Method | Route | What it does | Key required |
 |---|---|---|---|
-| GET | `/` | página de chat de demonstração | não |
-| GET | `/painel` | painel com o relatório (a página abre, mas os dados pedem a chave) | sim, para os dados |
-| POST | `/atendimentos` | recebe `{"conversa_id", "mensagem"}` e devolve a análise e a resposta | não (tem limite por minuto) |
-| GET | `/atendimentos` | lista atendimentos (`?limite=20&somente_humano=true`) | sim |
-| GET | `/relatorio` | total, % para humano, contagem por intenção e urgência | sim |
-| GET | `/saude` | verifica se a API está no ar | não |
+| GET | `/` | demo chat page | no |
+| GET | `/painel` | report dashboard (the page opens, but the data needs the key) | yes, for the data |
+| POST | `/atendimentos` | receives `{"conversa_id", "mensagem"}` and returns the analysis and the answer | no (has a per-minute limit) |
+| GET | `/atendimentos` | lists conversations (`?limite=20&somente_humano=true`) | yes |
+| GET | `/relatorio` | total, % sent to a human, counts by intent and urgency | yes |
+| GET | `/saude` | health check | no |
 
 ```bash
 curl -X POST localhost:8000/atendimentos -H "content-type: application/json" \
   -d '{"conversa_id": "5562999990000", "mensagem": "quero cancelar meu pedido"}'
-curl localhost:8000/relatorio -H "x-chave: SUA_CHAVE_DO_SERVICO"
+curl localhost:8000/relatorio -H "x-chave: YOUR_SERVICE_KEY"
 ```
 
-Respostas de erro:
-| Código | Quando |
+Error responses:
+| Code | When |
 |---|---|
-| 401 | chave ausente ou errada nas rotas protegidas |
-| 422 | dados inválidos; a resposta diz qual campo está errado |
-| 429 | passou do limite de mensagens por minuto |
-| 503 | o banco de dados está fora do ar |
-| 500 | erro inesperado (o detalhe técnico fica só no log) |
+| 401 | missing or wrong key on protected routes |
+| 422 | invalid data; the response says which field is wrong |
+| 429 | over the per-minute message limit |
+| 503 | the database is down |
+| 500 | unexpected error (technical details stay in the log) |
 
-## Estrutura
+## Structure
 ```
-api.py                    rotas FastAPI, validação, chave, limite por minuto, logs e tratamento de erros
-analise.py                IA (API REST), plano B por regras e regra de transferência para humano
-perguntas_frequentes.py   busca na base de perguntas frequentes
-perguntas_frequentes.json perguntas e respostas da loja (fácil de editar sem mexer no código)
-banco.py                  SQLite ou PostgreSQL: salvar, histórico, listagem e relatório SQL
-atendente.py              versão de terminal (demo e conversa)
-static/                   página de chat e painel
-testes/                   testes automáticos (rodam no GitHub Actions a cada push)
-Dockerfile                empacota o projeto para rodar em qualquer servidor
-render.yaml               configuração para publicar no Render
+api.py                    FastAPI routes, validation, key, per-minute limit, logs and error handling
+analise.py                AI (REST API), rule-based fallback and the hand-off-to-human rule
+perguntas_frequentes.py   FAQ search
+perguntas_frequentes.json store questions and answers (easy to edit without touching the code)
+banco.py                  SQLite or PostgreSQL: save, history, listing and SQL report
+atendente.py              terminal version (demo and chat)
+static/                   chat page and dashboard
+testes/                   automated tests (run on GitHub Actions on every push)
+Dockerfile                packages the project to run on any server
+render.yaml               Render deployment settings
 ```
 
-## Testes
+## Tests
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest -v
 ```
-Os testes cobrem:
-- as regras do plano B, com vários casos reais de mensagens;
-- a base de perguntas frequentes;
-- o banco, rodando os mesmos testes no SQLite e no PostgreSQL;
-- a API: entradas inválidas, chave, limite por minuto, banco fora do ar e logs sem dados pessoais;
-- a IA com respostas simuladas: JSON quebrado, intenção inventada, timeout, chave inválida e resposta com bloco de raciocínio antes do texto.
+The tests cover:
+- the fallback rules, with many real-world messages;
+- the FAQ search;
+- the database, running the same tests on SQLite and PostgreSQL;
+- the API: invalid input, key, per-minute limit, database down and logs without personal data;
+- the AI with simulated responses: broken JSON, made-up intent, timeout, invalid key and a reasoning block before the text.
 
-Para rodar também os testes de PostgreSQL no seu computador, defina `TESTE_POSTGRES_URL` com o endereço de um banco de teste. No GitHub Actions isso já acontece sozinho.
+To also run the PostgreSQL tests locally, set `TESTE_POSTGRES_URL` to a test database. GitHub Actions does this automatically.
 
-## Publicar no ar (Render)
-1. No Render: **New > Blueprint**, escolha este repositório (ele lê o `render.yaml`).
-2. Preencha `ANTHROPIC_API_KEY`. A `CHAVE_DO_SERVICO` é gerada automaticamente.
-3. Opcional: preencha `DATABASE_URL` com um PostgreSQL gratuito para os dados não sumirem.
-4. Depois do deploy, abra a URL do serviço.
+## Deploying (Render)
+1. On Render: **New > Blueprint**, pick this repository (it reads `render.yaml`).
+2. Fill in `ANTHROPIC_API_KEY`. `CHAVE_DO_SERVICO` is generated automatically.
+3. Optional: set `DATABASE_URL` to a free PostgreSQL database so the data is kept.
+4. After the deploy, open the service URL.
 
-## Decisões de projeto
-- **A IA responde em JSON** e o código confere cada valor antes de usar. Nunca confio cegamente na saída do modelo.
-- **A IA só usa as informações da loja** (regras e perguntas frequentes), para reduzir respostas inventadas.
-- **O plano B** garante que o cliente sempre recebe resposta, mesmo sem IA.
-- **O texto do cliente é tratado como dado** no prompt, para reduzir o risco de alguém dar ordens para a IA.
-- **O mesmo SQL roda nos dois bancos**: só muda o marcador de parâmetro (`?` no SQLite, `%s` no PostgreSQL). Parâmetros sempre separados do SQL, nunca concatenados (evita SQL injection).
-- **Logs sem dados pessoais**: o log guarda intenção, urgência, origem e tempo, mas não o texto da mensagem.
-- **Limite de 1000 caracteres**, limite por minuto e chave nas rotas com dados de clientes.
+## Design decisions
+- **The AI answers in JSON** and the code checks every value before using it. The model output is never trusted blindly.
+- **The AI only uses the store's information** (rules and FAQ), to reduce made-up answers.
+- **The fallback** makes sure the customer always gets an answer, even without AI.
+- **Customer text is treated as data** in the prompt, to reduce the risk of someone giving orders to the AI.
+- **The same SQL runs on both databases**: only the parameter marker changes (`?` on SQLite, `%s` on PostgreSQL). Parameters are always separate from the SQL, never concatenated (prevents SQL injection).
+- **Logs without personal data**: the log keeps intent, urgency, source and time, but not the message text.
+- **1000-character limit**, per-minute limit and a key on routes with customer data.
 
-## Limitações e próximos passos
-- A busca nas perguntas frequentes é por palavra-chave. O próximo passo seria busca por significado (embeddings).
-- O plano B por palavras-chave é simples e depende da ordem das regras.
-- O limite por minuto fica na memória do servidor. Com várias instâncias, precisaria de algo compartilhado (Redis).
-- Próximos passos: integração real com WhatsApp e medir a qualidade da IA com um conjunto de mensagens de teste.
+## Limitations and next steps
+- The FAQ search is keyword based. The next step would be meaning-based search (embeddings).
+- The keyword fallback is simple and depends on the order of the rules.
+- The per-minute limit lives in the server's memory. With several instances it would need shared storage (Redis).
+- Next steps: real WhatsApp integration and measuring AI quality with a set of test messages.
 
-## Autor
-Matheus Wilton, estudante de Gestão da TI · [github.com/matheuswilton](https://github.com/matheuswilton)
+## Author
+Matheus Wilton, IT Management student · [github.com/matheuswilton](https://github.com/matheuswilton) · [LinkedIn](https://www.linkedin.com/in/matheus-wilton-04b56a402)
