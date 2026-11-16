@@ -8,10 +8,10 @@ def atender(conversa_id, mensagem):
     resultado = analise.analisar(mensagem, historico)
     banco.salvar_atendimento(conversa_id, mensagem, resultado)
     print("Atendente: " + resultado["resposta"])
-    textoHumano = "nao"
+    texto_humano = "nao"
     if resultado["transferir_humano"]:
-        textoHumano = "SIM"
-    print("  [intencao=" + resultado["intencao"] + " | urgencia=" + resultado["urgencia"] + " | humano=" + textoHumano + " | analise=" + resultado["origem"] + "]")
+        texto_humano = "SIM"
+    print("  [intencao=" + resultado["intencao"] + " | urgencia=" + resultado["urgencia"] + " | humano=" + texto_humano + " | analise=" + resultado["origem"] + "]")
 
 def mostrar_relatorio():
     relatorio = banco.gerar_relatorio()
