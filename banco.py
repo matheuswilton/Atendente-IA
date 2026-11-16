@@ -1,6 +1,10 @@
 import os
 import sqlite3
 from datetime import datetime
+import psycopg
+from psycopg.rows import dict_row
+# erros que significam "o banco de dados falhou" (a API responde 503 para eles)
+erros_de_banco = (sqlite3.Error, psycopg.Error)
 tabela_sqlite = """CREATE TABLE IF NOT EXISTS atendimentos (
 id INTEGER PRIMARY KEY AUTOINCREMENT,
 conversa_id TEXT,
@@ -28,9 +32,7 @@ def usando_postgres():
 
 def conectar():
     if usando_postgres():
-        import psycopg
-        from psycopg.rows import dict_row
-        conexao = psycopg.connect(os.environ["DATABASE_URL"], row_factory=dict_row)
+        conexao = psycopg.connect(os.environ["DATABASE_URL"], row_factory=dict_row, connect_timeout=10)
         conexao.execute(tabela_postgres)
         conexao.commit()
         return conexao

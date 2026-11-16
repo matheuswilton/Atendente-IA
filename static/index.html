@@ -52,7 +52,11 @@ async function enviar(texto) {
   try {
     var resposta = await fetch("/atendimentos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversa_id: conversaId, mensagem: texto }) });
     if (resposta.status === 429) { adicionar("atendente", "Muitas mensagens seguidas. Espere um minuto e tente de novo."); return; }
-    if (!resposta.ok) { adicionar("atendente", "Erro ao falar com o servidor."); return; }
+    if (!resposta.ok) {
+      var erro = await resposta.json().catch(function () { return {}; });
+      adicionar("atendente", "Erro: " + (typeof erro.detail === "string" ? erro.detail : "não consegui falar com o servidor."));
+      return;
+    }
     var dados = await resposta.json();
     adicionar("atendente", dados.resposta);
     var etiqueta = document.createElement("div");

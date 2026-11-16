@@ -3,6 +3,7 @@ import json
 import logging
 import requests
 import perguntas_frequentes
+registro = logging.getLogger("atendente.analise")
 
 modelo_ia = "claude-haiku-5-5"
 url_api = "https://api.anthropic.com/v1/messages"
@@ -85,6 +86,8 @@ def analisar_com_ia(mensagem, historico, chave_api, perguntas=None):
     dados = resposta_http.json()
     if dados.get("stop_reason") == "refusal":
         raise ValueError("a IA recusou responder")
+    if dados.get("stop_reason") == "max_tokens":
+        raise ValueError("a resposta da IA foi cortada no meio (max_tokens)")
     # a resposta pode ter mais de um bloco (ex: raciocinio), entao procuro o bloco de texto
     texto_da_ia = ""
     for bloco in dados.get("content", []):
@@ -93,9 +96,36 @@ def analisar_com_ia(mensagem, historico, chave_api, perguntas=None):
     texto_da_ia = texto_da_ia.replace("```json", "").replace("```", "").strip()
     resultado = json.loads(texto_da_ia)
     # confere se a IA devolveu valores validos, senao da erro e o plano B assume
-    if resultado["intencao"] not in lista_intencoes or resultado["urgencia"] not in lista_urgencias or not resultado["resposta"]:
-        raise ValueError("IA devolveu valores invalidos")
+    if not isinstance(resultado, dict):
+        raise ValueError("a IA nao devolveu um objeto JSON")
+    if resultado.get("intencao") not in lista_intencoes:
+        raise ValueError("a IA devolveu uma intencao desconhecida: " + str(resultado.get("intencao")))
+    if resultado.get("urgencia") not in lista_urgencias:
+        raise ValueError("a IA devolveu uma urgencia desconhecida: " + str(resultado.get("urgencia")))
+    if not isinstance(resultado.get("resposta"), str) or resultado["resposta"].strip() == "":
+        raise ValueError("a IA devolveu uma resposta vazia")
     return {"intencao": resultado["intencao"], "urgencia": resultado["urgencia"], "resposta": resultado["resposta"]}
+
+def descrever_erro_da_ia(erro):
+    # transforma o erro tecnico em um motivo claro para o log (nunca mostra a chave)
+    if isinstance(erro, requests.Timeout):
+        return "a IA demorou demais para responder (timeout)"
+    if isinstance(erro, requests.ConnectionError):
+        return "nao consegui conectar na API da IA"
+    if isinstance(erro, requests.HTTPError):
+        codigo = erro.response.status_code if erro.response is not None else 0
+        if codigo == 401:
+            return "chave da IA invalida (HTTP 401): confira a ANTHROPIC_API_KEY"
+        if codigo == 429:
+            return "limite de uso da IA atingido (HTTP 429)"
+        if codigo >= 500:
+            return "a API da IA esta com problema (HTTP " + str(codigo) + ")"
+        return "a API da IA recusou o pedido (HTTP " + str(codigo) + ")"
+    if isinstance(erro, json.JSONDecodeError):
+        return "a IA devolveu um texto que nao e JSON"
+    if isinstance(erro, ValueError):
+        return str(erro)
+    return "erro inesperado: " + type(erro).__name__
 
 def analisar(mensagem, historico=None):
     # funcao principal: tenta a IA, se nao der usa as regras simples
@@ -110,7 +140,7 @@ def analisar(mensagem, historico=None):
             resultado = analisar_com_ia(mensagem, historico, chave_api, perguntas)
             origem = "ia"
         except Exception as erro:
-            logging.warning("IA falhou, usando regras simples: %s", erro)
+            registro.warning("IA falhou, usando o plano B por regras. Motivo: %s", descrever_erro_da_ia(erro))
             resultado = analisar_sem_ia(mensagem, perguntas)
             origem = "regras_apos_falha_da_ia"
     else:

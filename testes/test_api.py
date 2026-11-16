@@ -88,3 +88,39 @@ def test_painel_nao_mostra_dados_sem_chave(cliente, monkeypatch):
     assert cliente.get("/atendimentos?somente_humano=true", headers={"x-chave": "errada"}).status_code == 401
     lista = cliente.get("/atendimentos?somente_humano=true", headers={"x-chave": "segredo123"}).json()
     assert lista[0]["mensagem_cliente"] == "isso e um absurdo"
+
+def test_dados_invalidos_explicam_o_campo(cliente):
+    resposta = cliente.post("/atendimentos", json={"conversa_id": "a"})
+    assert resposta.status_code == 422
+    assert resposta.json()["detail"] == "dados invalidos"
+    assert resposta.json()["problemas"][0].startswith("mensagem:")
+
+def test_banco_fora_do_ar_responde_503(cliente, monkeypatch):
+    import sqlite3
+    import banco
+    def banco_quebrado(*args, **kwargs):
+        raise sqlite3.OperationalError("disco cheio")
+    monkeypatch.setattr(banco, "buscar_historico", banco_quebrado)
+    resposta = cliente.post("/atendimentos", json={"conversa_id": "a", "mensagem": "oi"})
+    assert resposta.status_code == 503
+    assert "banco de dados indisponivel" in resposta.json()["detail"]
+
+def test_erro_inesperado_responde_500_sem_detalhe_tecnico(monkeypatch, tmp_path):
+    monkeypatch.setenv("BANCO_ATENDIMENTOS", str(tmp_path / "teste.db"))
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    api.registro_de_acessos.clear()
+    def analise_quebrada(*args, **kwargs):
+        raise RuntimeError("detalhe interno secreto")
+    monkeypatch.setattr(api.analise, "analisar", analise_quebrada)
+    cliente_sem_excecao = TestClient(api.app, raise_server_exceptions=False)
+    resposta = cliente_sem_excecao.post("/atendimentos", json={"conversa_id": "a", "mensagem": "oi"})
+    assert resposta.status_code == 500
+    assert "secreto" not in resposta.text
+
+def test_log_do_atendimento_nao_mostra_o_texto_do_cliente(cliente, caplog):
+    import logging
+    caplog.set_level(logging.INFO)
+    cliente.post("/atendimentos", json={"conversa_id": "a", "mensagem": "meu cpf e 123.456.789-00"})
+    assert "intencao=" in caplog.text
+    assert "123.456.789-00" not in caplog.text

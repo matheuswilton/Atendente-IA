@@ -115,3 +115,34 @@ def test_cancelamento_e_intencao_valida_para_a_ia(monkeypatch):
     resultado = analise.analisar("quero cancelar")
     assert resultado["origem"] == "ia"
     assert resultado["intencao"] == "cancelamento"
+
+class RespostaComErroHttp:
+    def __init__(self, codigo):
+        self.status_code = codigo
+    def raise_for_status(self):
+        raise analise.requests.HTTPError("erro " + str(self.status_code), response=self)
+
+@pytest.mark.parametrize("codigo, motivo_esperado", [[401, "chave da IA invalida"], [429, "limite de uso da IA"], [529, "API da IA esta com problema"]])
+def test_erro_http_da_ia_tem_motivo_claro_no_log(monkeypatch, caplog, codigo, motivo_esperado):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "chave-secreta-de-teste")
+    monkeypatch.setattr(analise.requests, "post", lambda *args, **kwargs: RespostaComErroHttp(codigo))
+    resultado = analise.analisar("meu pedido nao chegou")
+    assert resultado["origem"] == "regras_apos_falha_da_ia"
+    assert motivo_esperado in caplog.text
+    assert "chave-secreta-de-teste" not in caplog.text
+
+def test_timeout_da_ia_usa_plano_b(monkeypatch, caplog):
+    def post_que_demora(*args, **kwargs):
+        raise analise.requests.Timeout("demorou")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "chave-falsa")
+    monkeypatch.setattr(analise.requests, "post", post_que_demora)
+    resultado = analise.analisar("quero trocar o tenis")
+    assert resultado["intencao"] == "troca_devolucao"
+    assert "timeout" in caplog.text
+
+def test_ia_sem_campo_resposta_usa_plano_b(monkeypatch, caplog):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "chave-falsa")
+    monkeypatch.setattr(analise.requests, "post", lambda *args, **kwargs: RespostaFalsa('{"intencao": "elogio", "urgencia": "baixa"}'))
+    resultado = analise.analisar("adorei")
+    assert resultado["origem"] == "regras_apos_falha_da_ia"
+    assert "resposta vazia" in caplog.text
