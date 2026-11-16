@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atendente IA - Loja Aurora</title>
+<style>
+body { font-family: system-ui, sans-serif; background: #f3f4f6; margin: 0; display: flex; justify-content: center; }
+main { width: 100%; max-width: 560px; padding: 16px; box-sizing: border-box; }
+h1 { font-size: 1.3rem; margin: 8px 0 4px; }
+p.sub { color: #555; margin: 0 0 12px; font-size: .9rem; }
+#conversa { background: #fff; border-radius: 12px; padding: 12px; height: 55vh; overflow-y: auto; border: 1px solid #ddd; }
+.balao { max-width: 85%; padding: 8px 12px; border-radius: 12px; margin: 6px 0; word-wrap: break-word; }
+.cliente { background: #2563eb; color: #fff; margin-left: auto; }
+.atendente { background: #e5e7eb; }
+.etiquetas { font-size: .72rem; color: #555; margin: -2px 0 8px; }
+.humano { color: #b91c1c; font-weight: 600; }
+form { display: flex; gap: 8px; margin-top: 10px; }
+input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #bbb; font-size: 1rem; }
+button { padding: 10px 16px; border: 0; border-radius: 8px; background: #2563eb; color: #fff; font-size: 1rem; cursor: pointer; }
+button:disabled { opacity: .5; }
+.dicas { margin-top: 10px; font-size: .8rem; color: #555; }
+.dicas a { color: #2563eb; cursor: pointer; margin-right: 8px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Atendente IA - Loja Aurora</h1>
+<p class="sub">Projeto de demonstração. Escreva como um cliente e veja a intenção, a urgência e se iria para um humano. <a href="/docs">Documentação da API</a></p>
+<div id="conversa"></div>
+<form id="formulario">
+<input id="campo" placeholder="Digite sua mensagem..." maxlength="1000" autocomplete="off">
+<button id="botao">Enviar</button>
+</form>
+<div class="dicas">Teste: <a data-m="Meu pedido ainda nao chegou">pedido atrasado</a><a data-m="Fui cobrado duas vezes, isso e um absurdo, vou no procon">cobrança dupla</a><a data-m="Voces vendem para outro pais?">pergunta fora do assunto</a></div>
+</main>
+<script>
+var conversaId = "web-" + Math.random().toString(36).slice(2, 10);
+var caixa = document.getElementById("conversa");
+var campo = document.getElementById("campo");
+var botao = document.getElementById("botao");
+function adicionar(classe, texto) {
+  var balao = document.createElement("div");
+  balao.className = "balao " + classe;
+  balao.textContent = texto;
+  caixa.appendChild(balao);
+  caixa.scrollTop = caixa.scrollHeight;
+}
+async function enviar(texto) {
+  adicionar("cliente", texto);
+  botao.disabled = true;
+  try {
+    var resposta = await fetch("/atendimentos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ conversa_id: conversaId, mensagem: texto }) });
+    if (resposta.status === 429) { adicionar("atendente", "Muitas mensagens seguidas. Espere um minuto e tente de novo."); return; }
+    if (!resposta.ok) { adicionar("atendente", "Erro ao falar com o servidor."); return; }
+    var dados = await resposta.json();
+    adicionar("atendente", dados.resposta);
+    var etiqueta = document.createElement("div");
+    etiqueta.className = "etiquetas";
+    etiqueta.textContent = "intenção: " + dados.intencao + " | urgência: " + dados.urgencia + " | análise: " + dados.origem + (dados.transferir_humano ? " | " : "");
+    if (dados.transferir_humano) {
+      var aviso = document.createElement("span");
+      aviso.className = "humano";
+      aviso.textContent = "transferir para humano";
+      etiqueta.appendChild(aviso);
+    }
+    caixa.appendChild(etiqueta);
+    caixa.scrollTop = caixa.scrollHeight;
+  } catch (erro) {
+    adicionar("atendente", "Não consegui conectar ao servidor.");
+  } finally {
+    botao.disabled = false;
+  }
+}
+document.getElementById("formulario").addEventListener("submit", function (evento) {
+  evento.preventDefault();
+  var texto = campo.value.trim();
+  if (texto === "") { return; }
+  campo.value = "";
+  enviar(texto);
+});
+document.querySelectorAll(".dicas a").forEach(function (link) {
+  link.addEventListener("click", function () { enviar(link.dataset.m); });
+});
+</script>
+</body>
+</html>
