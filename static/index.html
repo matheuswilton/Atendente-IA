@@ -32,7 +32,7 @@ button:disabled { opacity: .5; }
 <input id="campo" placeholder="Digite sua mensagem..." maxlength="1000" autocomplete="off">
 <button id="botao">Enviar</button>
 </form>
-<div class="dicas">Teste: <a data-m="Meu pedido ainda nao chegou">pedido atrasado</a><a data-m="Fui cobrado duas vezes, isso e um absurdo, vou no procon">cobrança dupla</a><a data-m="Voces vendem para outro pais?">pergunta fora do assunto</a></div>
+<div class="dicas">Teste: <a data-m="Meu pedido ainda nao chegou">pedido atrasado</a><a data-m="Fui cobrado duas vezes, isso e um absurdo, vou no procon">cobrança dupla</a><a data-m="Voces entregam em Portugal?">pergunta frequente</a><a data-m="Qual a previsao do tempo amanha?">fora do assunto</a></div>
 </main>
 <script>
 var conversaId = "web-" + Math.random().toString(36).slice(2, 10);
@@ -57,7 +57,9 @@ async function enviar(texto) {
     adicionar("atendente", dados.resposta);
     var etiqueta = document.createElement("div");
     etiqueta.className = "etiquetas";
-    etiqueta.textContent = "intenção: " + dados.intencao + " | urgência: " + dados.urgencia + " | análise: " + dados.origem + (dados.transferir_humano ? " | " : "");
+    etiqueta.textContent = "intenção: " + dados.intencao + " | urgência: " + dados.urgencia + " | análise: " + dados.origem;
+    if (dados.perguntas_consultadas && dados.perguntas_consultadas.length > 0) { etiqueta.textContent += " | consultou: " + dados.perguntas_consultadas.join("; "); }
+    if (dados.transferir_humano) { etiqueta.textContent += " | "; }
     if (dados.transferir_humano) {
       var aviso = document.createElement("span");
       aviso.className = "humano";

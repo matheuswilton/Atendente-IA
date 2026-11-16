@@ -16,7 +16,7 @@ def test_elogio_tem_urgencia_baixa():
 
 def test_mensagem_desconhecida_vai_para_humano(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    resultado = analise.analisar("voces vendem para outro pais?")
+    resultado = analise.analisar("qual a previsao do tempo amanha?")
     assert resultado["intencao"] == "outro"
     assert resultado["transferir_humano"] == 1
 
