@@ -25,6 +25,7 @@ mensagens_de_exemplo = [
     "Quero trocar o tenis que comprei, ficou grande",
     "Fui cobrado duas vezes no cartao, isso e um absurdo, vou no procon",
     "Nao consigo fazer login no site, aparece erro",
+    "Quero cancelar minha compra, me arrependi",
     "Parabens pelo atendimento, adorei a compra!",
     "Voces vendem para outro pais?"]
 

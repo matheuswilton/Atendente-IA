@@ -1,3 +1,4 @@
+import pytest
 import analise
 
 def test_rastreio_de_pedido():
@@ -86,3 +87,31 @@ def test_envia_o_pedido_certo_para_a_api(monkeypatch):
     assert pedidos[0]["headers"]["x-api-key"] == "chave-falsa"
     assert pedidos[0]["corpo"]["model"] == analise.modelo_ia
     assert pedidos[0]["corpo"]["thinking"] == {"type": "disabled"}
+
+casos_do_plano_b = [
+    ["Quero cancelar meu pedido", "cancelamento", "media"],
+    ["me arrependi da compra, quero desistir", "cancelamento", "media"],
+    ["Quero devolver o pedido, veio quebrado", "troca_devolucao", "media"],
+    ["o tênis ficou com tamanho errado", "troca_devolucao", "media"],
+    ["Minha encomenda está atrasada", "rastreio_pedido", "media"],
+    ["Paguei no cartão e não aprovou", "pagamento", "media"],
+    ["Quero o estorno da cobrança", "pagamento", "media"],
+    ["não consigo acessar minha conta, dá erro", "suporte_tecnico", "media"],
+    ["Amei o produto, obrigada!", "elogio", "baixa"],
+    ["Que descaso, vou no Reclame Aqui", "outro", "alta"],
+    ["PÉSSIMO, o pior pedido da minha vida", "rastreio_pedido", "alta"],
+    ["Bom dia", "outro", "baixa"]]
+
+@pytest.mark.parametrize("mensagem, intencao_esperada, urgencia_esperada", casos_do_plano_b)
+def test_casos_do_plano_b(mensagem, intencao_esperada, urgencia_esperada):
+    resultado = analise.analisar_sem_ia(mensagem)
+    assert resultado["intencao"] == intencao_esperada
+    assert resultado["urgencia"] == urgencia_esperada
+
+def test_cancelamento_e_intencao_valida_para_a_ia(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "chave-falsa")
+    json_da_ia = '{"intencao": "cancelamento", "urgencia": "media", "resposta": "Vou cancelar para voce."}'
+    monkeypatch.setattr(analise.requests, "post", lambda *args, **kwargs: RespostaFalsa(json_da_ia))
+    resultado = analise.analisar("quero cancelar")
+    assert resultado["origem"] == "ia"
+    assert resultado["intencao"] == "cancelamento"
