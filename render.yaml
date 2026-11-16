@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: atendente-ia
+    runtime: docker
+    plan: free
+    healthCheckPath: /saude
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CHAVE_DO_SERVICO
+        generateValue: true
+      - key: BANCO_ATENDIMENTOS
+        value: /tmp/atendimentos.db
