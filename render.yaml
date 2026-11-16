@@ -9,5 +9,8 @@ services:
         sync: false
       - key: CHAVE_DO_SERVICO
         generateValue: true
+      # opcional: endereco de um PostgreSQL para os dados nao sumirem quando o servico reinicia
+      - key: DATABASE_URL
+        sync: false
       - key: BANCO_ATENDIMENTOS
         value: /tmp/atendimentos.db

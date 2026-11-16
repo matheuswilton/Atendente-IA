@@ -8,6 +8,7 @@ def cliente(tmp_path, monkeypatch):
     monkeypatch.setenv("BANCO_ATENDIMENTOS", str(tmp_path / "teste.db"))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("CHAVE_DO_SERVICO", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     api.registro_de_acessos.clear()
     return TestClient(api.app)
 
