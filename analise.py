@@ -54,11 +54,19 @@ def montar_texto_para_ia(mensagem, historico):
 
 def analisar_com_ia(mensagem, historico, chave_api):
     cabecalhos = {"x-api-key": chave_api, "anthropic-version": "2023-06-01", "content-type": "application/json"}
-    corpo = {"model": modelo_ia, "max_tokens": 400, "system": instrucao_para_ia,
+    # thinking desligado: para classificar uma mensagem curta nao precisa de raciocinio longo
+    corpo = {"model": modelo_ia, "max_tokens": 1000, "thinking": {"type": "disabled"}, "system": instrucao_para_ia,
              "messages": [{"role": "user", "content": montar_texto_para_ia(mensagem, historico)}]}
     resposta_http = requests.post(url_api, headers=cabecalhos, json=corpo, timeout=20)
     resposta_http.raise_for_status()
-    texto_da_ia = resposta_http.json()["content"][0]["text"]
+    dados = resposta_http.json()
+    if dados.get("stop_reason") == "refusal":
+        raise ValueError("a IA recusou responder")
+    # a resposta pode ter mais de um bloco (ex: raciocinio), entao procuro o bloco de texto
+    texto_da_ia = ""
+    for bloco in dados.get("content", []):
+        if bloco.get("type") == "text":
+            texto_da_ia = texto_da_ia + bloco["text"]
     texto_da_ia = texto_da_ia.replace("```json", "").replace("```", "").strip()
     resultado = json.loads(texto_da_ia)
     # confere se a IA devolveu valores validos, senao da erro e o plano B assume
@@ -66,8 +74,10 @@ def analisar_com_ia(mensagem, historico, chave_api):
         raise ValueError("IA devolveu valores invalidos")
     return {"intencao": resultado["intencao"], "urgencia": resultado["urgencia"], "resposta": resultado["resposta"]}
 
-def analisar(mensagem, historico=[]):
+def analisar(mensagem, historico=None):
     # funcao principal: tenta a IA, se nao der usa as regras simples
+    if historico is None:
+        historico = []
     chave_api = os.environ.get("ANTHROPIC_API_KEY")
     origem = "regras"
     if chave_api:

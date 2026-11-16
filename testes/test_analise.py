@@ -60,3 +60,29 @@ def test_plano_b_quando_ia_inventa_intencao(monkeypatch):
     monkeypatch.setattr(analise.requests, "post", lambda *args, **kwargs: RespostaFalsa(json_ruim))
     resultado = analise.analisar("oi")
     assert resultado["origem"] == "regras_apos_falha_da_ia"
+class RespostaComRaciocinio:
+    # simula a IA devolvendo um bloco de raciocinio antes do bloco de texto
+    def raise_for_status(self):
+        pass
+    def json(self):
+        json_da_ia = '{"intencao": "elogio", "urgencia": "baixa", "resposta": "Obrigado!"}'
+        return {"stop_reason": "end_turn", "content": [{"type": "thinking", "thinking": ""}, {"type": "text", "text": json_da_ia}]}
+
+def test_le_o_bloco_de_texto_mesmo_com_raciocinio_antes(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "chave-falsa")
+    monkeypatch.setattr(analise.requests, "post", lambda *args, **kwargs: RespostaComRaciocinio())
+    resultado = analise.analisar("adorei a loja")
+    assert resultado["origem"] == "ia"
+    assert resultado["intencao"] == "elogio"
+
+def test_envia_o_pedido_certo_para_a_api(monkeypatch):
+    pedidos = []
+    def post_falso(url, headers, json, timeout):
+        pedidos.append({"url": url, "headers": headers, "corpo": json})
+        return RespostaFalsa('{"intencao": "outro", "urgencia": "baixa", "resposta": "ok"}')
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "chave-falsa")
+    monkeypatch.setattr(analise.requests, "post", post_falso)
+    analise.analisar("oi")
+    assert pedidos[0]["headers"]["x-api-key"] == "chave-falsa"
+    assert pedidos[0]["corpo"]["model"] == analise.modelo_ia
+    assert pedidos[0]["corpo"]["thinking"] == {"type": "disabled"}
