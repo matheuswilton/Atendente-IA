@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Atendimentos - Loja Aurora</title>
+<style>
+body { font-family: system-ui, sans-serif; background: #f3f4f6; margin: 0; display: flex; justify-content: center; color: #111827; }
+main { width: 100%; max-width: 860px; padding: 16px; box-sizing: border-box; }
+h1 { font-size: 1.3rem; margin: 8px 0 4px; }
+h2 { font-size: 1rem; margin: 0 0 10px; }
+p.sub { color: #555; margin: 0 0 12px; font-size: .9rem; }
+a { color: #2563eb; }
+form { display: flex; gap: 8px; margin-bottom: 12px; }
+input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #bbb; font-size: 1rem; }
+button { padding: 10px 16px; border: 0; border-radius: 8px; background: #2563eb; color: #fff; font-size: 1rem; cursor: pointer; }
+.erro { color: #b91c1c; font-weight: 600; }
+.cartoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.cartao, .bloco { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 12px; }
+.numero { font-size: 1.8rem; font-weight: 700; }
+.rotulo { color: #555; font-size: .85rem; }
+.duas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.linha { display: grid; grid-template-columns: 130px 1fr 40px; align-items: center; gap: 8px; margin: 6px 0; font-size: .85rem; }
+.barra { background: #e5e7eb; border-radius: 6px; height: 12px; overflow: hidden; }
+.barra div { background: #2563eb; height: 100%; }
+.tabela { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.tabela th, .tabela td { text-align: left; padding: 6px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+.rolagem { overflow-x: auto; }
+.escondido { display: none; }
+</style>
+</head>
+<body>
+<main>
+<h1>Painel de Atendimentos</h1>
+<p class="sub">Relatório gerado com consultas SQL. Os dados exigem a chave do serviço. <a href="/">Voltar ao chat</a></p>
+<form id="formulario">
+<input id="campo_chave" type="password" placeholder="Chave do serviço (x-chave)" autocomplete="off">
+<button>Ver relatório</button>
+</form>
+<p id="aviso" class="erro"></p>
+<section id="conteudo" class="escondido">
+<div class="cartoes">
+<div class="cartao"><div class="numero" id="total">0</div><div class="rotulo">atendimentos</div></div>
+<div class="cartao"><div class="numero" id="para_humano">0</div><div class="rotulo">transferidos para humano</div></div>
+<div class="cartao"><div class="numero" id="percentual">0%</div><div class="rotulo">% para humano</div></div>
+</div>
+<div class="duas">
+<div class="bloco"><h2>Por intenção</h2><div id="por_intencao"></div></div>
+<div class="bloco"><h2>Por urgência</h2><div id="por_urgencia"></div></div>
+</div>
+<div class="bloco">
+<h2>Últimos atendimentos que foram para humano</h2>
+<div class="rolagem">
+<table class="tabela">
+<thead><tr><th>Data</th><th>Conversa</th><th>Mensagem</th><th>Intenção</th><th>Urgência</th></tr></thead>
+<tbody id="lista_humano"></tbody>
+</table>
+</div>
+</div>
+</section>
+</main>
+<script>
+var campoChave = document.getElementById("campo_chave");
+var aviso = document.getElementById("aviso");
+var conteudo = document.getElementById("conteudo");
+try { campoChave.value = sessionStorage.getItem("chave_painel") || ""; } catch (erro) {}
+function desenharBarras(idDoBloco, contagens, total) {
+  var bloco = document.getElementById(idDoBloco);
+  bloco.textContent = "";
+  Object.keys(contagens).forEach(function (nome) {
+    var quantidade = contagens[nome];
+    var porcentagem = total > 0 ? Math.round(quantidade * 100 / total) : 0;
+    var linha = document.createElement("div");
+    linha.className = "linha";
+    var rotulo = document.createElement("span");
+    rotulo.textContent = nome;
+    var barra = document.createElement("div");
+    barra.className = "barra";
+    var preenchido = document.createElement("div");
+    preenchido.style.width = porcentagem + "%";
+    barra.appendChild(preenchido);
+    var numero = document.createElement("span");
+    numero.textContent = quantidade;
+    linha.appendChild(rotulo);
+    linha.appendChild(barra);
+    linha.appendChild(numero);
+    bloco.appendChild(linha);
+  });
+  if (Object.keys(contagens).length === 0) { bloco.textContent = "Ainda não há atendimentos."; }
+}
+function desenharTabela(atendimentos) {
+  var corpo = document.getElementById("lista_humano");
+  corpo.textContent = "";
+  atendimentos.forEach(function (atendimento) {
+    var linha = document.createElement("tr");
+    [atendimento.data_hora, atendimento.conversa_id, atendimento.mensagem_cliente, atendimento.intencao, atendimento.urgencia].forEach(function (valor) {
+      var celula = document.createElement("td");
+      celula.textContent = valor;
+      linha.appendChild(celula);
+    });
+    corpo.appendChild(linha);
+  });
+}
+async function carregar() {
+  aviso.textContent = "";
+  var cabecalhos = { "x-chave": campoChave.value };
+  try {
+    var respostaRelatorio = await fetch("/relatorio", { headers: cabecalhos });
+    if (respostaRelatorio.status === 401) { aviso.textContent = "Chave inválida ou ausente."; conteudo.className = "escondido"; return; }
+    if (!respostaRelatorio.ok) { aviso.textContent = "Erro ao buscar o relatório."; return; }
+    var relatorio = await respostaRelatorio.json();
+    var respostaLista = await fetch("/atendimentos?somente_humano=true&limite=10", { headers: cabecalhos });
+    var lista = respostaLista.ok ? await respostaLista.json() : [];
+    try { sessionStorage.setItem("chave_painel", campoChave.value); } catch (erro) {}
+    document.getElementById("total").textContent = relatorio.total;
+    document.getElementById("para_humano").textContent = relatorio.para_humano;
+    document.getElementById("percentual").textContent = relatorio.percentual_humano + "%";
+    desenharBarras("por_intencao", relatorio.por_intencao, relatorio.total);
+    desenharBarras("por_urgencia", relatorio.por_urgencia, relatorio.total);
+    desenharTabela(lista);
+    conteudo.className = "";
+  } catch (erro) {
+    aviso.textContent = "Não consegui conectar ao servidor.";
+  }
+}
+document.getElementById("formulario").addEventListener("submit", function (evento) {
+  evento.preventDefault();
+  carregar();
+});
+if (campoChave.value !== "") { carregar(); }
+</script>
+</body>
+</html>

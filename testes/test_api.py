@@ -74,3 +74,16 @@ def test_limite_por_minuto(cliente, monkeypatch):
     for numero in range(3):
         assert cliente.post("/atendimentos", json={"conversa_id": "a", "mensagem": "oi"}).status_code == 200
     assert cliente.post("/atendimentos", json={"conversa_id": "a", "mensagem": "oi"}).status_code == 429
+
+def test_pagina_do_painel_abre(cliente):
+    resposta = cliente.get("/painel")
+    assert resposta.status_code == 200
+    assert "Painel de Atendimentos" in resposta.text
+
+def test_painel_nao_mostra_dados_sem_chave(cliente, monkeypatch):
+    monkeypatch.setenv("CHAVE_DO_SERVICO", "segredo123")
+    cliente.post("/atendimentos", json={"conversa_id": "a", "mensagem": "isso e um absurdo"})
+    assert "isso e um absurdo" not in cliente.get("/painel").text
+    assert cliente.get("/atendimentos?somente_humano=true", headers={"x-chave": "errada"}).status_code == 401
+    lista = cliente.get("/atendimentos?somente_humano=true", headers={"x-chave": "segredo123"}).json()
+    assert lista[0]["mensagem_cliente"] == "isso e um absurdo"

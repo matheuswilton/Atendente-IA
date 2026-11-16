@@ -37,6 +37,11 @@ def limitar_acessos(requisicao):
 def pagina_inicial():
     return FileResponse(os.path.join(pasta_do_projeto, "static", "index.html"))
 
+@app.get("/painel", include_in_schema=False)
+def pagina_do_painel():
+    # a pagina em si e publica, mas os dados que ela mostra so chegam com a chave certa
+    return FileResponse(os.path.join(pasta_do_projeto, "static", "painel.html"))
+
 @app.get("/saude")
 def verificar_saude():
     return {"status": "ok"}
